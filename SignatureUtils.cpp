@@ -1,11 +1,13 @@
-// By Dalton Messmer
+/*
+ * SignatureUtils.cpp
+ * By Dalton Messmer
+ */
 
 #include "SignatureUtils.h"
 
-#include <wincrypt.h>
+#include <Windows.h>
+//#include <wincrypt.h>
 #include <atlconv.h>
-
-#pragma comment(lib, "wincrypt")
 
 static constexpr DWORD G_Encoding = (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING);
 
@@ -28,10 +30,7 @@ bool GetDigitalSignatureSubjectImpl(const std::string& filename, std::string& su
 	USES_CONVERSION;
 	subject.clear();
 
-	if (filename.empty())
-		return true;
-
-	if (filename[0] == 0)
+	if (filename.empty() || filename[0] == 0)
 		return true;
 
 	LPWSTR lpwszFileName = A2W(filename.c_str());

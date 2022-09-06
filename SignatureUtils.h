@@ -1,4 +1,7 @@
-// By Dalton Messmer
+/*
+ * SignatureUtils.h
+ * By Dalton Messmer
+ */
 
 #pragma once
 
