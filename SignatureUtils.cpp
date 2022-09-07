@@ -8,6 +8,8 @@
 #include <Windows.h>
 #include <atlconv.h>
 
+#include <string_view>
+
 using namespace sigutils;
 
 static constexpr DWORD G_Encoding = (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING);
