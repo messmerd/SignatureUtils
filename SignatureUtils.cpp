@@ -10,6 +10,9 @@
 #include <atlconv.h>
 
 #include <iostream>
+#include <sstream>
+
+using namespace sigutils;
 
 static constexpr DWORD G_Encoding = (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING);
 
@@ -35,39 +38,89 @@ struct MsgWrapper
 
 static bool GetCertStoreAndMsg(const std::string& filename, StoreWrapper& hStore, MsgWrapper& hMsg);
 static PCCERT_CONTEXT GetCertContext(const std::string& filename);
-static bool GetDigitalSignatureIssuerImpl(const std::string& filename, std::string& issuer);
-static bool GetDigitalSignatureSubjectImpl(const std::string& filename, std::string& subject);
+static std::optional<CertInfo> GetSubjectOrIssuer(const std::string& filename, bool getIssuer);
+static CertInfo ParseCertInfo(const std::string& input, const std::string& delimiter);
 
-bool IsSigned(const std::string& filename)
+////// PUBLIC FUNCTIONS //////
+
+bool sigutils::IsSigned(const std::string& filename)
 {
 	StoreWrapper hStore;
 	MsgWrapper hMsg;
 	return GetCertStoreAndMsg(filename, hStore, hMsg);
 }
 
-bool GetDigitalSignatureIssuer(const std::string& filename, std::string& issuer)
+std::optional<CertInfo> sigutils::GetIssuer(const std::string& filename)
 {
-	__try
-	{
-		return GetDigitalSignatureIssuerImpl(filename, issuer);
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-	{
-		return true;
-	}
+	return GetSubjectOrIssuer(filename, true);
 }
 
-bool GetDigitalSignatureSubject(const std::string& filename, std::string& subject)
+std::optional<CertInfo> sigutils::GetSubject(const std::string& filename)
 {
-	__try
+	return GetSubjectOrIssuer(filename, false);
+}
+
+bool sigutils::GetIssuerName(const std::string& filename, std::string& issuer)
+{
+	issuer.clear();
+
+	PCCERT_CONTEXT pCertContext = GetCertContext(filename);
+	if (!pCertContext)
+		return true;
+
+	// Get issuer name size
+	DWORD nameSize = CertGetNameStringA(pCertContext, CERT_NAME_ATTR_TYPE, CERT_NAME_ISSUER_FLAG, szOID_ORGANIZATION_NAME, NULL, 0);
+	if (0 == nameSize)
+		return true;
+
+	// Allocate memory for issuer name
+	LPSTR name = static_cast<LPSTR>(LocalAlloc(LPTR, nameSize * sizeof(CHAR)));
+
+	// Get issuer name
+	nameSize = CertGetNameStringA(pCertContext, CERT_NAME_ATTR_TYPE, CERT_NAME_ISSUER_FLAG, szOID_ORGANIZATION_NAME, name, nameSize);
+	if (0 == nameSize || !name)
 	{
-		return GetDigitalSignatureSubjectImpl(filename, subject);
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-	{
+		LocalFree(name);
 		return true;
 	}
+
+	issuer = name;
+
+	LocalFree(name);
+	return false;
 }
+
+bool sigutils::GetSubjectName(const std::string& filename, std::string& subject)
+{
+	subject.clear();
+
+	PCCERT_CONTEXT pCertContext = GetCertContext(filename);
+	if (!pCertContext)
+		return true;
+
+	// Get subject name size
+	DWORD nameSize = CertGetNameStringA(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL, NULL, 0);
+	if (0 == nameSize)
+		return true;
+
+	// Allocate memory for subject name
+	LPSTR name = static_cast<LPSTR>(LocalAlloc(LPTR, nameSize * sizeof(CHAR)));
+
+	// Get subject name
+	nameSize = CertGetNameStringA(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL, name, nameSize);
+	if (0 == nameSize || !name)
+	{
+		LocalFree(name);
+		return true;
+	}
+
+	subject = name;
+
+	LocalFree(name);
+	return false;
+}
+
+////// Helpers //////
 
 bool GetCertStoreAndMsg(const std::string& filename, StoreWrapper& hStore, MsgWrapper& hMsg)
 {
@@ -113,62 +166,83 @@ PCCERT_CONTEXT GetCertContext(const std::string& filename)
 	return nullptr;
 }
 
-bool GetDigitalSignatureIssuerImpl(const std::string& filename, std::string& issuer)
+CertInfo ParseCertInfo(const std::string& input, const std::string& delimiter)
 {
-	issuer.clear();
+	CertInfo info;
 
-	PCCERT_CONTEXT pCertContext = GetCertContext(filename);
-	if (!pCertContext)
-		return true;
-
-	// Get issuer name size
-	DWORD nameSize = CertGetNameStringA(pCertContext, CERT_NAME_ATTR_TYPE, CERT_NAME_ISSUER_FLAG, szOID_ORGANIZATION_NAME, NULL, 0);
-	if (0 == nameSize)
-		return true;
-
-	// Allocate memory for issuer name
-	LPSTR name = static_cast<LPSTR>(LocalAlloc(LPTR, nameSize * sizeof(CHAR)));
-
-	// Get issuer name
-	nameSize = CertGetNameStringA(pCertContext, CERT_NAME_ATTR_TYPE, CERT_NAME_ISSUER_FLAG, szOID_ORGANIZATION_NAME, name, nameSize);
-	if (0 == nameSize || !name)
+	size_t start = 0;
+	size_t end = input.find(delimiter);
+	while (end != std::string::npos)
 	{
-		LocalFree(name);
-		return true;
+		std::string entry =  input.substr(start, end - start);
+
+		start = end + delimiter.length();
+		end = input.find(delimiter, start);
+
+		size_t equalsPos = entry.find('=');
+		if (equalsPos == std::string::npos || equalsPos == 0)
+			continue;
+
+		const std::string x500 = entry.substr(0, equalsPos);
+		std::string rdn = entry.substr(equalsPos + 1);
+		if (rdn.empty())
+			continue;
+		if (rdn[0] == '=')
+			rdn = rdn.substr(1, rdn.size() - 2);
+
+		if (x500 == "C")
+		{
+			info.C = rdn;
+		}
+		else if (x500 == "S")
+		{
+			info.S = rdn;
+		}
+		else if (x500 == "L")
+		{
+			info.L = rdn;
+		}
+		else if (x500 == "O")
+		{
+			info.O = rdn;
+		}
+		else if (x500 == "CN")
+		{
+			info.CN = rdn;
+		}
 	}
 
-	issuer = name;
-
-	LocalFree(name);
-	return false;
+	return info;
 }
 
-bool GetDigitalSignatureSubjectImpl(const std::string& filename, std::string& subject)
+std::optional<CertInfo> GetSubjectOrIssuer(const std::string& filename, bool getIssuer)
 {
-	subject.clear();
-
 	PCCERT_CONTEXT pCertContext = GetCertContext(filename);
 	if (!pCertContext)
-		return true;
+		return std::nullopt;
 
-	// Get subject name size
-	DWORD nameSize = CertGetNameStringA(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL, NULL, 0);
+	DWORD dwStrType = CERT_X500_NAME_STR | CERT_NAME_STR_CRLF_FLAG;
+	DWORD dwFlags = getIssuer ? CERT_NAME_ISSUER_FLAG : 0;
+
+	// Get RDN string
+	DWORD nameSize = CertGetNameStringA(pCertContext, CERT_NAME_RDN_TYPE, dwFlags, &dwStrType, NULL, 0);
 	if (0 == nameSize)
-		return true;
+		return std::nullopt;
 
-	// Allocate memory for subject name
+	// Allocate memory for RDN string
 	LPSTR name = static_cast<LPSTR>(LocalAlloc(LPTR, nameSize * sizeof(CHAR)));
 
-	// Get subject name
-	nameSize = CertGetNameStringA(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL, name, nameSize);
+	// Get RDN string
+	nameSize = CertGetNameStringA(pCertContext, CERT_NAME_RDN_TYPE, dwFlags, &dwStrType, name, nameSize);
 	if (0 == nameSize || !name)
 	{
 		LocalFree(name);
-		return true;
+		return std::nullopt;
 	}
 
-	subject = name;
-
+	const std::string delimiter = "\r\n";
+	std::string x500PlusRDN = name + delimiter;
 	LocalFree(name);
-	return false;
+
+	return ParseCertInfo(x500PlusRDN, delimiter);
 }
