@@ -160,46 +160,48 @@ PCCERT_CONTEXT GetCertContext(const std::string& filename)
 CertInfo ParseCertInfo(const std::string& input, const std::string& delimiter)
 {
 	CertInfo info;
+	auto input_view = std::string_view(input);
 
 	size_t start = 0;
-	size_t end = input.find(delimiter);
-	while (end != std::string::npos)
+	size_t end = input_view.find(delimiter);
+	while (end != std::string_view::npos)
 	{
-		std::string entry =  input.substr(start, end - start);
+		const auto entry = input_view.substr(start, end - start);
 
 		start = end + delimiter.length();
 		end = input.find(delimiter, start);
 
 		size_t equalsPos = entry.find('=');
-		if (equalsPos == std::string::npos || equalsPos == 0)
+		if (equalsPos == std::string_view::npos || equalsPos == 0)
 			continue;
 
-		const std::string x500 = entry.substr(0, equalsPos);
-		std::string rdn = entry.substr(equalsPos + 1);
+		const auto x500 = entry.substr(0, equalsPos);
+		auto rdn = entry.substr(equalsPos + 1);
 		if (rdn.empty())
 			continue;
 		if (rdn[0] == '=')
 			rdn = rdn.substr(1, rdn.size() - 2);
 
-		if (x500 == "C")
-		{
-			info.C = rdn;
-		}
-		else if (x500 == "S")
-		{
-			info.S = rdn;
-		}
-		else if (x500 == "L")
-		{
-			info.L = rdn;
-		}
-		else if (x500 == "O")
-		{
-			info.O = rdn;
-		}
-		else if (x500 == "CN")
+		if (x500 == "CN")
 		{
 			info.CN = rdn;
+		}
+		else switch (x500[0])
+		{
+		case 'C':
+			info.C = rdn;
+			break;
+		case 'S':
+			info.S = rdn;
+			break;
+		case 'L':
+			info.L = rdn;
+			break;
+		case 'O':
+			info.O = rdn;
+			break;
+		default:
+			break;
 		}
 	}
 
