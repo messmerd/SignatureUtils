@@ -12,7 +12,7 @@ namespace sigutils {
 
 struct CertInfo
 {
-	std::string CN, O, L, S, C;
+	std::string CN, OU, O, L, S, C;
 };
 
 bool IsSigned(const std::string& filename);

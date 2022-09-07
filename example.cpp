@@ -52,6 +52,7 @@ int main(int argc, char* argv[])
 void PrintCertInfo(const CertInfo& info)
 {
 	std::cout << "\tCN: " << info.CN << "\n";
+	std::cout << "\tOU: " << info.OU << "\n";
 	std::cout << "\t O: " << info.O  << "\n";
 	std::cout << "\t L: " << info.L  << "\n";
 	std::cout << "\t S: " << info.S  << "\n";

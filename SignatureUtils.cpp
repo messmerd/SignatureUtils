@@ -182,23 +182,30 @@ CertInfo ParseCertInfo(const std::string& input, const std::string& delimiter)
 		if (rdn[0] == '=')
 			rdn = rdn.substr(1, rdn.size() - 2);
 
-		if (x500 == "CN")
+		if (x500.size() > 1)
 		{
-			info.CN = rdn;
+			if (x500 == "CN")
+			{
+				info.CN = rdn;
+			}
+			else if (x500 == "OU")
+			{
+				info.OU = rdn;
+			}
 		}
 		else switch (x500[0])
 		{
-		case 'C':
-			info.C = rdn;
-			break;
-		case 'S':
-			info.S = rdn;
+		case 'O':
+			info.O = rdn;
 			break;
 		case 'L':
 			info.L = rdn;
 			break;
-		case 'O':
-			info.O = rdn;
+		case 'S':
+			info.S = rdn;
+			break;
+		case 'C':
+			info.C = rdn;
 			break;
 		default:
 			break;
