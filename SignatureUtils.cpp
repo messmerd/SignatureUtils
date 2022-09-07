@@ -6,11 +6,7 @@
 #include "SignatureUtils.h"
 
 #include <Windows.h>
-//#include <wincrypt.h>
 #include <atlconv.h>
-
-#include <iostream>
-#include <sstream>
 
 using namespace sigutils;
 
@@ -18,22 +14,22 @@ static constexpr DWORD G_Encoding = (X509_ASN_ENCODING | PKCS_7_ASN_ENCODING);
 
 struct StoreWrapper
 {
-	StoreWrapper() : m_p(nullptr) {}
-	StoreWrapper(HCERTSTORE p) : m_p(p) {}
-	~StoreWrapper() { if (m_p) { CertCloseStore(m_p, 0); } }
-	StoreWrapper(StoreWrapper&& other) { m_p = other.m_p; other.m_p = nullptr; }
+	StoreWrapper() : p(nullptr) {}
+	StoreWrapper(HCERTSTORE p_in) : p(p_in) {}
+	~StoreWrapper() { if (p) { CertCloseStore(p, 0); } }
+	StoreWrapper(StoreWrapper&& other) { p = other.p; other.p = nullptr; }
 	StoreWrapper(const StoreWrapper&) = delete;
-	HCERTSTORE m_p;
+	HCERTSTORE p;
 };
 
 struct MsgWrapper
 {
-	MsgWrapper() : m_p(nullptr) {}
-	MsgWrapper(HCRYPTMSG p) : m_p(p) {}
-	~MsgWrapper() { if (m_p) { CryptMsgClose(m_p); } }
-	MsgWrapper(MsgWrapper&& other) { m_p = other.m_p; other.m_p = nullptr; }
+	MsgWrapper() : p(nullptr) {}
+	MsgWrapper(HCRYPTMSG p_in) : p(p_in) {}
+	~MsgWrapper() { if (p) { CryptMsgClose(p); } }
+	MsgWrapper(MsgWrapper&& other) { p = other.p; other.p = nullptr; }
 	MsgWrapper(const MsgWrapper&) = delete;
-	HCRYPTMSG m_p;
+	HCRYPTMSG p;
 };
 
 static bool GetCertStoreAndMsg(const std::string& filename, StoreWrapper& hStore, MsgWrapper& hMsg);
@@ -133,7 +129,8 @@ bool GetCertStoreAndMsg(const std::string& filename, StoreWrapper& hStore, MsgWr
 	if (lpwszFileName == NULL)
 		return nullptr;
 
-	return CryptQueryObject(CERT_QUERY_OBJECT_FILE, lpwszFileName, CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED, CERT_QUERY_FORMAT_FLAG_BINARY, 0, NULL, NULL, NULL, &hStore.m_p, &hMsg.m_p, NULL);
+	return CryptQueryObject(CERT_QUERY_OBJECT_FILE, lpwszFileName, CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED,
+		CERT_QUERY_FORMAT_FLAG_BINARY, 0, NULL, NULL, NULL, &hStore.p, &hMsg.p, NULL);
 }
 
 PCCERT_CONTEXT GetCertContext(const std::string& filename)
@@ -144,20 +141,20 @@ PCCERT_CONTEXT GetCertContext(const std::string& filename)
 		return nullptr; // The file is presumably not signed
 
 	DWORD dwSignerInfo = 0;
-	if (!CryptMsgGetParam(hMsg.m_p, CMSG_SIGNER_INFO_PARAM, 0, NULL, &dwSignerInfo) || !dwSignerInfo)
+	if (!CryptMsgGetParam(hMsg.p, CMSG_SIGNER_INFO_PARAM, 0, NULL, &dwSignerInfo) || !dwSignerInfo)
 		return nullptr;
 
 	PCMSG_SIGNER_INFO pSignerInfo = static_cast<PCMSG_SIGNER_INFO>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwSignerInfo));
 	if (!pSignerInfo)
 		return nullptr;
 
-	if (CryptMsgGetParam(hMsg.m_p, CMSG_SIGNER_INFO_PARAM, 0, pSignerInfo, &dwSignerInfo))
+	if (CryptMsgGetParam(hMsg.p, CMSG_SIGNER_INFO_PARAM, 0, pSignerInfo, &dwSignerInfo))
 	{
 		CERT_INFO ci;
 		ci.Issuer = pSignerInfo->Issuer;
 		ci.SerialNumber = pSignerInfo->SerialNumber;
 
-		PCCERT_CONTEXT pCertContext = CertFindCertificateInStore(hStore.m_p, G_Encoding, 0, CERT_FIND_SUBJECT_CERT, &ci, NULL);
+		PCCERT_CONTEXT pCertContext = CertFindCertificateInStore(hStore.p, G_Encoding, 0, CERT_FIND_SUBJECT_CERT, &ci, NULL);
 		HeapFree(GetProcessHeap(), 0, pSignerInfo);
 
 		return pCertContext;
