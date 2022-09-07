@@ -10,34 +10,31 @@ using namespace sigutils;
 
 static void PrintCertInfo(const CertInfo& info);
 
-int main()
+int main(int argc, char* argv[])
 {
-	const std::string filename = R"(C:\Windows\system32\ws2_32.dll)";
+	const std::string filename = argc == 2 ? argv[1] : R"(C:\Windows\system32\ws2_32.dll)";
 	std::cout << "For '" << filename << "':\n\n";
 
 	if (IsSigned(filename))
 	{
-		std::string issuerName;
-		if (GetIssuerName(filename, issuerName))
+		if (auto issuerName = GetIssuerName(filename); issuerName.has_value())
 		{
-			std::cout << "An error occurred.\n";
-			return 1;
+			std::cout << "Issuer name:  '" << issuerName.value() << "'\n";
 		}
 
-		std::string subjectName;
-		if (GetSubjectName(filename, subjectName))
+		if (auto subjectName = GetSubjectName(filename); subjectName.has_value())
 		{
-			std::cout << "An error occurred.\n";
-			return 1;
+			std::cout << "Subject name:  '" << subjectName.value() << "'\n";
 		}
-		std::cout << "Issuer name:  '" << issuerName << "'\n";
-		std::cout << "Subject name: '" << subjectName << "'\n\n";
+
+		std::cout << "\n";
 
 		if (auto issuer = GetIssuer(filename); issuer.has_value())
 		{
 			std::cout << "Issuer info:\n";
 			PrintCertInfo(issuer.value());
 		}
+
 		if (auto subject = GetSubject(filename); subject.has_value())
 		{
 			std::cout << "Subject info:\n";
@@ -46,7 +43,7 @@ int main()
 	}
 	else
 	{
-		std::cout << "Not digitally signed.\n";
+		std::cout << "File is not digitally signed or does not exist.\n";
 	}
 
 	return 0;

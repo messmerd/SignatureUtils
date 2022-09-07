@@ -20,7 +20,7 @@ bool IsSigned(const std::string& filename);
 std::optional<CertInfo> GetIssuer(const std::string& filename);
 std::optional<CertInfo> GetSubject(const std::string& filename);
 
-bool GetIssuerName(const std::string& filename, std::string& issuer);
-bool GetSubjectName(const std::string& filename, std::string& subject);
+std::optional<std::string> GetIssuerName(const std::string& filename);
+std::optional<std::string> GetSubjectName(const std::string& filename);
 
 } // namespace sigutils

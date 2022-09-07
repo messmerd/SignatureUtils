@@ -56,18 +56,16 @@ std::optional<CertInfo> sigutils::GetSubject(const std::string& filename)
 	return GetSubjectOrIssuer(filename, false);
 }
 
-bool sigutils::GetIssuerName(const std::string& filename, std::string& issuer)
+std::optional<std::string> sigutils::GetIssuerName(const std::string& filename)
 {
-	issuer.clear();
-
 	PCCERT_CONTEXT pCertContext = GetCertContext(filename);
 	if (!pCertContext)
-		return true;
+		return std::nullopt;
 
 	// Get issuer name size
 	DWORD nameSize = CertGetNameStringA(pCertContext, CERT_NAME_ATTR_TYPE, CERT_NAME_ISSUER_FLAG, szOID_ORGANIZATION_NAME, NULL, 0);
 	if (0 == nameSize)
-		return true;
+		return std::nullopt;
 
 	// Allocate memory for issuer name
 	LPSTR name = static_cast<LPSTR>(LocalAlloc(LPTR, nameSize * sizeof(CHAR)));
@@ -77,27 +75,24 @@ bool sigutils::GetIssuerName(const std::string& filename, std::string& issuer)
 	if (0 == nameSize || !name)
 	{
 		LocalFree(name);
-		return true;
+		return std::nullopt;
 	}
 
-	issuer = name;
-
+	std::string issuer = name;
 	LocalFree(name);
-	return false;
+	return issuer;
 }
 
-bool sigutils::GetSubjectName(const std::string& filename, std::string& subject)
+std::optional<std::string> sigutils::GetSubjectName(const std::string& filename)
 {
-	subject.clear();
-
 	PCCERT_CONTEXT pCertContext = GetCertContext(filename);
 	if (!pCertContext)
-		return true;
+		return std::nullopt;
 
 	// Get subject name size
 	DWORD nameSize = CertGetNameStringA(pCertContext, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, NULL, NULL, 0);
 	if (0 == nameSize)
-		return true;
+		return std::nullopt;
 
 	// Allocate memory for subject name
 	LPSTR name = static_cast<LPSTR>(LocalAlloc(LPTR, nameSize * sizeof(CHAR)));
@@ -107,13 +102,12 @@ bool sigutils::GetSubjectName(const std::string& filename, std::string& subject)
 	if (0 == nameSize || !name)
 	{
 		LocalFree(name);
-		return true;
+		return std::nullopt;
 	}
 
-	subject = name;
-
+	std::string subject = name;
 	LocalFree(name);
-	return false;
+	return subject;
 }
 
 ////// Helpers //////
