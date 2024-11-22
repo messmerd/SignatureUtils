@@ -3,7 +3,7 @@
  * By Dalton Messmer
  */
 
-#include "SignatureUtils.h"
+#include "SignatureUtils/SignatureUtils.h"
 
 #include <Windows.h>
 #include <atlconv.h>
